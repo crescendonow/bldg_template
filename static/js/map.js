@@ -1,7 +1,9 @@
 let map, drawnItems, drawControl, resultLayer;
 
 function initMap() {
-  map = L.map("map", { center: [13.0, 101.0], zoom: 12 });
+  const thailandBounds = L.latLngBounds([5.5, 97.0], [20.8, 106.0]);
+  map = L.map("map");
+  map.fitBounds(thailandBounds, { padding: [20, 20] });
 
   // Esri World Imagery satellite basemap
   L.tileLayer(
