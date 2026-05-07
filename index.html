@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PWA Building Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; }
+    .badge-gpu { background: #7c3aed; color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; }
+    .method-card { cursor: pointer; border: 2px solid transparent; transition: border-color .15s; }
+    .method-card.selected { border-color: #facc15; }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+  </style>
+</head>
+<body class="bg-gray-950 text-white">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Left Panel -->
+  <div id="panel" class="w-96 flex-none flex flex-col bg-gray-900 overflow-y-auto text-sm">
+    <!-- Header -->
+    <div class="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center gap-2">
+      <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+      </svg>
+      <span class="font-bold text-yellow-400">PWA Building Extractor</span>
+    </div>
+
+    <div class="flex-1 px-4 py-4 space-y-5">
+
+      <!-- Step 1: ROI -->
+      <section>
+        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">1. วาด ROI บนแผนที่</h2>
+        <div id="roi-info" class="text-xs text-gray-400 bg-gray-800 rounded px-3 py-2">ยังไม่ได้วาด ROI — ใช้เครื่องมือวาดมุมซ้ายบนของแผนที่</div>
+      </section>
+
+      <!-- Step 2: Method -->
+      <section>
+        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">2. เลือกวิธีดึงข้อมูล</h2>
+        <div class="space-y-2">
+
+          <label class="method-card selected block bg-gray-800 rounded-lg p-3" data-method="osm">
+            <input type="radio" name="method" value="osm" class="hidden" checked />
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="font-medium text-white">OpenStreetMap</div>
+                <div class="text-xs text-gray-400 mt-0.5">ข้อมูลจาก OSM — เร็ว ไม่ต้องใช้ GPU</div>
+              </div>
+              <span class="text-xs bg-green-700 text-white px-2 py-0.5 rounded-full ml-2 flex-none">CPU</span>
+            </div>
+          </label>
+
+          <label class="method-card block bg-gray-800 rounded-lg p-3" data-method="gee">
+            <input type="radio" name="method" value="gee" class="hidden" />
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="font-medium text-white">Google Open Buildings V3</div>
+                <div class="text-xs text-gray-400 mt-0.5">Google Earth Engine — ~2,400+ อาคาร ต่อพื้นที่</div>
+              </div>
+              <span class="text-xs bg-blue-700 text-white px-2 py-0.5 rounded-full ml-2 flex-none">GEE</span>
+            </div>
+          </label>
+
+          <label class="method-card block bg-gray-800 rounded-lg p-3" data-method="sam2">
+            <input type="radio" name="method" value="sam2" class="hidden" />
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="font-medium text-white flex items-center gap-1.5">
+                  SAM2 Segmentation
+                  <span class="badge-gpu">GPU</span>
+                </div>
+                <div class="text-xs text-gray-400 mt-0.5">Segment Anything Model — รัน Google Colab</div>
+              </div>
+              <span class="text-xs bg-purple-700 text-white px-2 py-0.5 rounded-full ml-2 flex-none">Colab</span>
+            </div>
+          </label>
+
+          <label class="method-card block bg-gray-800 rounded-lg p-3" data-method="segformer">
+            <input type="radio" name="method" value="segformer" class="hidden" />
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="font-medium text-white flex items-center gap-1.5">
+                  SegFormer UNet++
+                  <span class="badge-gpu">GPU</span>
+                </div>
+                <div class="text-xs text-gray-400 mt-0.5">WHU Building Dataset model — รัน Google Colab</div>
+              </div>
+              <span class="text-xs bg-purple-700 text-white px-2 py-0.5 rounded-full ml-2 flex-none">Colab</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- GEE Options -->
+        <div id="gee-options" class="hidden mt-3 bg-gray-800 rounded-lg p-3">
+          <label class="text-xs text-gray-400">Confidence threshold</label>
+          <div class="flex items-center gap-2 mt-1">
+            <input id="confidence-slider" type="range" min="0" max="1" step="0.05" value="0.8"
+              class="flex-1 accent-yellow-400" />
+            <span id="confidence-val" class="text-yellow-400 font-mono w-10 text-right">0.80</span>
+          </div>
+        </div>
+
+        <!-- Colab Info -->
+        <div id="colab-info" class="hidden mt-3 bg-purple-900/40 border border-purple-700 rounded-lg p-3 text-xs text-purple-200">
+          วิธีนี้ต้องใช้ GPU — ระบบจะเตรียม job ให้ จากนั้นคลิก "Open in Google Colab" เพื่อรัน notebook (ใช้ T4 GPU ฟรี)
+        </div>
+      </section>
+
+      <!-- Step 3: Formats -->
+      <section>
+        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">3. รูปแบบไฟล์ที่ต้องการ</h2>
+        <div class="grid grid-cols-2 gap-1.5" id="format-checkboxes">
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="gpkg" checked class="accent-yellow-400" /> GeoPackage
+          </label>
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="geojson" checked class="accent-yellow-400" /> GeoJSON
+          </label>
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="fgb" class="accent-yellow-400" /> FlatGeobuf
+          </label>
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="shp" class="accent-yellow-400" /> Shapefile
+          </label>
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="kml" class="accent-yellow-400" /> KML
+          </label>
+          <label class="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <input type="checkbox" value="tab" class="accent-yellow-400" /> MapInfo TAB
+          </label>
+        </div>
+      </section>
+
+      <!-- Submit Button -->
+      <button id="btn-extract" disabled
+        class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-700 disabled:cursor-not-allowed
+               text-gray-900 font-bold rounded-lg transition-colors">
+        ดึงข้อมูลอาคาร
+      </button>
+
+      <!-- Job Status -->
+      <section id="job-status" class="hidden">
+        <div class="border-t border-gray-700 pt-4">
+          <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">สถานะ Job</h2>
+
+          <div id="status-cpu" class="hidden space-y-2">
+            <div class="flex justify-between text-xs">
+              <span id="status-text" class="text-gray-300">กำลังประมวลผล...</span>
+              <span id="progress-pct" class="text-yellow-400">0%</span>
+            </div>
+            <div class="bg-gray-700 rounded-full h-2">
+              <div id="progress-bar" class="bg-yellow-400 h-2 rounded-full transition-all" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div id="status-colab" class="hidden space-y-3">
+            <div class="text-xs text-purple-300">job เตรียมพร้อมแล้ว — เปิด Colab เพื่อรัน</div>
+            <a id="colab-link" href="#" target="_blank"
+              class="flex items-center justify-center gap-2 w-full py-2 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-medium transition-colors">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.374 0 0 5.373 0 12c0 6.628 5.374 12 12 12s12-5.372 12-12c0-6.627-5.374-12-12-12z"/>
+              </svg>
+              Open in Google Colab
+            </a>
+            <div class="text-xs text-gray-500">รอรับผลลัพธ์ (ตรวจสอบทุก 30 วินาที)...</div>
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+              <span id="colab-status-text" class="text-xs text-gray-400">รอ Colab ประมวลผล</span>
+            </div>
+          </div>
+
+          <!-- Downloads -->
+          <div id="download-section" class="hidden mt-3 space-y-2">
+            <div class="text-xs font-medium text-green-400 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              ดึงข้อมูลสำเร็จ
+            </div>
+            <div id="download-buttons" class="space-y-1.5"></div>
+          </div>
+
+          <!-- Error -->
+          <div id="error-section" class="hidden mt-3 bg-red-900/40 border border-red-700 rounded px-3 py-2 text-xs text-red-300">
+            <span id="error-text"></span>
+          </div>
+
+          <div class="mt-3">
+            <button id="btn-new-job" class="text-xs text-gray-500 hover:text-gray-300 underline">เริ่ม job ใหม่</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map" class="flex-1"></div>
+</div>
+
+<script src="/config.js"></script>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/jobs.js"></script>
+<script src="/static/js/formats.js"></script>
+<script src="/static/js/map.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  initMap();
+
+  // Method card selection
+  document.querySelectorAll(".method-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      document.querySelectorAll(".method-card").forEach((c) => c.classList.remove("selected"));
+      card.classList.add("selected");
+      card.querySelector("input").checked = true;
+      const method = card.dataset.method;
+      document.getElementById("gee-options").classList.toggle("hidden", method !== "gee");
+      document.getElementById("colab-info").classList.toggle("hidden", !["sam2","segformer"].includes(method));
+    });
+  });
+
+  // Confidence slider
+  const slider = document.getElementById("confidence-slider");
+  const confVal = document.getElementById("confidence-val");
+  slider.addEventListener("input", () => { confVal.textContent = parseFloat(slider.value).toFixed(2); });
+
+  // Format checkboxes — at least one required
+  document.querySelectorAll("#format-checkboxes input").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const checked = [...document.querySelectorAll("#format-checkboxes input:checked")];
+      if (checked.length === 0) cb.checked = true;
+    });
+  });
+
+  // Extract button
+  document.getElementById("btn-extract").addEventListener("click", handleExtract);
+  document.getElementById("btn-new-job").addEventListener("click", resetUI);
+});
+
+function getSelectedFormats() {
+  return [...document.querySelectorAll("#format-checkboxes input:checked")].map((c) => c.value);
+}
+
+function getSelectedMethod() {
+  return document.querySelector('input[name="method"]:checked').value;
+}
+
+async function handleExtract() {
+  if (!window.currentROI) return;
+  const method = getSelectedMethod();
+  const formats = getSelectedFormats();
+  const options = method === "gee" ? { min_confidence: parseFloat(document.getElementById("confidence-slider").value) } : {};
+
+  document.getElementById("btn-extract").disabled = true;
+  document.getElementById("job-status").classList.remove("hidden");
+  document.getElementById("download-section").classList.add("hidden");
+  document.getElementById("error-section").classList.add("hidden");
+
+  try {
+    const result = await submitExtract(window.currentROI, method, options, formats);
+    const jobId = result.job_id;
+
+    if (result.status === "pending_colab") {
+      showColabUI(jobId, result.colab_url);
+    } else {
+      showCpuUI(jobId);
+    }
+  } catch (e) {
+    showError(e.message);
+    document.getElementById("btn-extract").disabled = false;
+  }
+}
+
+function showCpuUI(jobId) {
+  document.getElementById("status-cpu").classList.remove("hidden");
+  document.getElementById("status-colab").classList.add("hidden");
+  startCpuPolling(jobId, updateCpuStatus, (job) => onJobDone(job));
+}
+
+function showColabUI(jobId, colabUrl) {
+  document.getElementById("status-colab").classList.remove("hidden");
+  document.getElementById("status-cpu").classList.add("hidden");
+  document.getElementById("colab-link").href = colabUrl;
+  startColabPolling(jobId, (job) => {
+    document.getElementById("colab-status-text").textContent = `รอ Colab ประมวลผล (job: ${job.job_id.slice(0,8)}...)`;
+  }, (job) => onJobDone(job));
+}
+
+function updateCpuStatus(job) {
+  document.getElementById("status-text").textContent =
+    job.status === "processing" ? "กำลังประมวลผล..." : job.status;
+  document.getElementById("progress-pct").textContent = `${job.progress_pct || 0}%`;
+  document.getElementById("progress-bar").style.width = `${job.progress_pct || 0}%`;
+}
+
+function onJobDone(job) {
+  if (job.status === "completed") {
+    document.getElementById("download-section").classList.remove("hidden");
+    document.getElementById("download-buttons").innerHTML = renderDownloadButtons(job.job_id, job.formats_ready);
+    document.getElementById("status-text").textContent = "เสร็จสิ้น";
+    document.getElementById("progress-bar").style.width = "100%";
+    document.getElementById("progress-pct").textContent = "100%";
+    document.getElementById("colab-status-text").textContent = "Colab ประมวลผลเสร็จแล้ว";
+  } else {
+    showError(job.error || "Job ล้มเหลว");
+  }
+}
+
+function showError(msg) {
+  document.getElementById("error-section").classList.remove("hidden");
+  document.getElementById("error-text").textContent = msg;
+}
+
+function resetUI() {
+  stopPolling();
+  document.getElementById("job-status").classList.add("hidden");
+  document.getElementById("status-cpu").classList.add("hidden");
+  document.getElementById("status-colab").classList.add("hidden");
+  document.getElementById("download-section").classList.add("hidden");
+  document.getElementById("error-section").classList.add("hidden");
+  document.getElementById("btn-extract").disabled = !window.currentROI;
+}
+</script>
+</body>
+</html>
