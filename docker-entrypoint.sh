@@ -15,7 +15,7 @@ case "$GO_GATEWAY_URL" in
     ;;
 esac
 
-printf 'window.BLDG_API_BASE = "";\n' > /usr/share/nginx/html/config.js
+printf 'window.BLDG_API_BASE = "%s";\n' "$GO_GATEWAY_URL" > /usr/share/nginx/html/config.js
 envsubst '${PORT} ${GO_GATEWAY_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 
 exec nginx -g 'daemon off;'
