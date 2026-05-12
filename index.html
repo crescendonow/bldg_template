@@ -5,16 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PWA Building Extractor</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@mapbox/mapbox-gl-draw@1.4.3/dist/mapbox-gl-draw.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/@mapbox/mapbox-gl-draw@1.4.3/dist/mapbox-gl-draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mapbox-gl-draw-rectangle-mode-cdn@1.0.0/dist/DrawRectangleMode.cdn.js"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; }
     .badge-gpu { background: #7c3aed; color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; }
     .method-card { cursor: pointer; border: 2px solid transparent; transition: border-color .15s; }
     .method-card.selected { border-color: #facc15; }
+    .mapboxgl-ctrl-group, .maplibregl-ctrl-group { background: #111827; border: 1px solid #374151; }
+    .mapboxgl-ctrl-group button, .maplibregl-ctrl-group button { filter: invert(1); }
+    #draw-rectangle { filter: none; color: #facc15; font-weight: 700; }
     ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
   </style>
 </head>
@@ -37,7 +41,26 @@
       <!-- Step 1: ROI -->
       <section>
         <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">1. วาด ROI บนแผนที่</h2>
-        <div id="roi-info" class="text-xs text-gray-400 bg-gray-800 rounded px-3 py-2">ยังไม่ได้วาด ROI — ใช้เครื่องมือวาดมุมซ้ายบนของแผนที่</div>
+        <div id="roi-info" class="text-xs text-gray-400 bg-gray-800 rounded px-3 py-2">ยังไม่ได้วาด ROI — ใช้ปุ่ม Polygon หรือ Rectangle บนแผนที่</div>
+      </section>
+
+      <!-- Boundary Layers -->
+      <section>
+        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">ชั้นข้อมูลขอบเขต</h2>
+        <div class="space-y-1.5 bg-gray-800 rounded-lg p-3">
+          <label class="flex items-center gap-2 cursor-pointer hover:text-yellow-300">
+            <input id="toggle-boundary-country" type="checkbox" class="accent-yellow-400" />
+            <span>ขอบเขตประเทศ/จังหวัด</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer hover:text-yellow-300">
+            <input id="toggle-boundary-amphoe" type="checkbox" class="accent-yellow-400" />
+            <span>ขอบเขตอำเภอ</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer hover:text-yellow-300">
+            <input id="toggle-boundary-tambon" type="checkbox" class="accent-yellow-400" />
+            <span>ขอบเขตตำบล</span>
+          </label>
+        </div>
       </section>
 
       <!-- Step 2: Method -->
